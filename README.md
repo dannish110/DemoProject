@@ -479,3 +479,285 @@ export class AppModule { }
 ---
 
 ### **Unit Testing**
+
+
+Here's a CSS design for your Angular project that is simple, clean, and responsive. This will style your **login page** and **event list page** for a modern look.
+
+### **1. Global Styles (`src/assets/styles.css`)**
+
+This file will apply global styles across your Angular app.
+
+```css
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f4f7fc;
+  color: #333;
+  padding: 20px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+button {
+  cursor: pointer;
+  background-color: #00B4D8;
+  border: none;
+  color: white;
+  font-size: 16px;
+  padding: 10px 20px;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0077B6;
+}
+
+input, textarea {
+  font-family: 'Arial', sans-serif;
+  border: 1px solid #d1d1d1;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  width: 100%;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #00B4D8;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+/* Flexbox Container */
+.flex-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.flex-container > div {
+  flex: 1;
+  min-width: 300px;
+}
+
+@media (max-width: 768px) {
+  .flex-container {
+    flex-direction: column;
+  }
+}
+```
+
+### **2. Login Page Styles (`login.component.css`)**
+
+This will style your login form and center it on the page with a clean layout.
+
+```css
+/* Login Page Styles */
+.login-container {
+  max-width: 500px;
+  margin: 50px auto;
+  background-color: #ffffff;
+  padding: 30px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-form label {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #666;
+}
+
+.login-form input {
+  padding: 12px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+  border: 1px solid #d1d1d1;
+  font-size: 16px;
+}
+
+.login-form button {
+  background-color: #00B4D8;
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.login-form button:hover {
+  background-color: #0077B6;
+}
+
+.error-message {
+  color: red;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 10px;
+}
+```
+
+### **3. Event List Page Styles (`event-list.component.css`)**
+
+This will style the event list display, making it neat and responsive.
+
+```css
+/* Event List Page Styles */
+.event-list-container {
+  margin-top: 30px;
+}
+
+.event-card {
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.event-card h3 {
+  color: #0077B6;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.event-card p {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.event-card .event-date {
+  color: #00B4D8;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.card-footer {
+  text-align: right;
+}
+
+.card-footer button {
+  background-color: #0077B6;
+  color: white;
+  border-radius: 5px;
+  padding: 8px 20px;
+}
+
+.card-footer button:hover {
+  background-color: #00B4D8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .event-card {
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .event-card h3 {
+    font-size: 22px;
+  }
+
+  .event-card p {
+    font-size: 14px;
+  }
+}
+```
+
+### **4. Styles for `app.component.css` (Navigation)**
+
+```css
+/* App Component (Navigation bar and common styles) */
+nav {
+  background-color: #CAF0F8;
+  padding: 15px 0;
+}
+
+nav a {
+  text-decoration: none;
+  color: #0077B6;
+  font-size: 16px;
+  margin: 0 20px;
+}
+
+nav a:hover {
+  color: #00B4D8;
+}
+
+nav .active {
+  color: #00B4D8;
+  font-weight: bold;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+header {
+  background-color: #CAF0F8;
+  padding: 20px;
+  text-align: center;
+}
+
+header h1 {
+  font-size: 36px;
+  color: #0077B6;
+}
+```
+
+### **5. Responsive Design**
+
+The above CSS includes media queries to handle responsiveness. The layout adapts to mobile screens, which ensures a good user experience on tablets and phones as well. The `.flex-container` and `.event-card` classes make the layout responsive for various screen sizes.
+
+### **6. Add Styles in Angular**
+
+Make sure to add the global CSS file and component-specific styles into their respective Angular components. The above CSS will ensure your app has a modern look and feel, with proper spacing, buttons, forms, and cards.
+
+---
+
+### **Summary of the Changes:**
+
+1. **Global Styles**: The general layout, body, buttons, forms, and typography are defined.
+2. **Login Styles**: Clean, centered login form with button hover effects.
+3. **Event List Styles**: Styled event cards with hover effects, suitable for both desktop and mobile views.
+4. **Responsive**: Ensures proper display across various screen sizes.
+   
+These styles will help in making the Angular app look modern and professional!
