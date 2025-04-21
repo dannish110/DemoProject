@@ -1,4 +1,4 @@
-Perfect! Here's the complete E-Learning Platform code in one reply, with:
+IPerfect! Here's the complete E-Learning Platform code in one reply, with:
 
 Spring Boot + MongoDB backend using layered architecture (Controller → Service → Repository)
 
@@ -503,3 +503,24 @@ Deployment setup
 
 I’ll guide you next!
 
+UserService.java
+
+package com.example.elearning.service;
+
+import com.example.elearning.model.User;
+import com.example.elearning.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+    @Autowired private UserRepository repo;
+
+    public User findByUsername(String username) {
+        return repo.findByUsername(username);
+    }
+
+    public User save(User user) {
+        return repo.save(user);
+    }
+}
