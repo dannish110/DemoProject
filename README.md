@@ -761,3 +761,520 @@ Make sure to add the global CSS file and component-specific styles into their re
 4. **Responsive**: Ensures proper display across various screen sizes.
    
 These styles will help in making the Angular app look modern and professional!
+
+
+
+____________________________________________
+// === E-Learning Platform (No DTOs) ===
+// Combined Spring Boot backend and Angular frontend
+
+// -----------------------------------
+// 1. BACKEND (Spring Boot + MongoDB)
+// -----------------------------------
+
+// --- pom.xml ---
+/*
+<project xmlns="http://maven.apache.org/POM/4.0.0" ...>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>elearning</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-mongodb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt</artifactId>
+      <version>0.9.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+  </dependencies>
+</project>
+*/
+
+// --- application.yml ---
+/*
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/elearning
+server:
+  port: 8080
+jwt:
+  secret: my_secret_key
+  expiration: 86400000
+*/
+
+// --- Main Application ---
+package com.example.elearning;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ElearningApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ElearningApplication.class, args);
+    }
+}
+
+// --- MODEL: User.java ---
+package com.example.elearning.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "users")
+public class User {
+    @Id
+    private String id;
+    private String name;
+    private String email;
+    @JsonIgnore
+    private String password;
+    private String role; // ADMIN, TEACHER, STUDENT
+
+    public User() {}
+    public User(String name, String email, String password, String role) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+    }
+    // getters & setters omitted for brevity
+}
+
+// --- MODEL: Lecture.java ---
+package com.example.elearning.model;
+
+public class Lecture {
+    private String title;
+    private String videoUrl;
+    public Lecture() {}
+    public Lecture(String title, String videoUrl) {
+        this.title = title;
+        this.videoUrl = videoUrl;
+    }
+    // getters & setters
+}
+
+// --- MODEL: Course.java ---
+package com.example.elearning.model;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import java.util.ArrayList;
+import java.util.List;
+
+@Document(collection = "courses")
+public class Course {
+    @Id
+    private String id;
+    private String title;
+    private String description;
+    private String teacherId;
+    private List<Lecture> lectures = new ArrayList<>();
+    // constructors, getters & setters
+}
+
+// --- REPOSITORIES ---
+package com.example.elearning.repository;
+
+import com.example.elearning.model.User;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import java.util.Optional;
+
+public interface UserRepository extends MongoRepository<User,String> {
+    Optional<User> findByEmail(String email);
+}
+
+package com.example.elearning.repository;
+
+import com.example.elearning.model.Course;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import java.util.List;
+
+public interface CourseRepository extends MongoRepository<Course,String> {
+    List<Course> findByTeacherId(String teacherId);
+}
+
+// --- SECURITY: JwtUtil.java ---
+package com.example.elearning.security;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import java.util.Date;
+
+@Component
+public class JwtUtil {
+    @Value("${jwt.secret}")
+    private String secret;
+    @Value("${jwt.expiration}")
+    private long expiration;
+
+    public String generateToken(String email, String role) {
+        return Jwts.builder()
+            .setSubject(email)
+            .claim("role", role)
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis()+expiration))
+            .signWith(SignatureAlgorithm.HS512, secret)
+            .compact();
+    }
+
+    private Claims getClaims(String token) {
+        return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+    }
+    public String extractEmail(String token) { return getClaims(token).getSubject(); }
+    public String extractRole(String token) { return (String)getClaims(token).get("role"); }
+    public boolean isValid(String token) { return getClaims(token).getExpiration().after(new Date()); }
+}
+
+// --- SECURITY: JwtFilter.java ---
+package com.example.elearning.security;
+
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import com.example.elearning.repository.UserRepository;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+
+@Component
+public class JwtFilter extends OncePerRequestFilter {
+    private final JwtUtil jwtUtil;
+    private final UserRepository userRepo;
+    public JwtFilter(JwtUtil jwtUtil, UserRepository userRepo) {
+        this.jwtUtil = jwtUtil; this.userRepo = userRepo;
+    }
+    @Override
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
+            throws ServletException, IOException {
+        String header = req.getHeader("Authorization");
+        if(header!=null && header.startsWith("Bearer ")){
+            String token = header.substring(7);
+            if(jwtUtil.isValid(token)){
+                String email = jwtUtil.extractEmail(token);
+                String role = jwtUtil.extractRole(token);
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                    email, null, List.of(new SimpleGrantedAuthority("ROLE_"+role)));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+        }
+        chain.doFilter(req,res);
+    }
+}
+
+// --- SECURITY: SecurityConfig.java ---
+package com.example.elearning.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+public class SecurityConfig {
+    private final JwtFilter jwtFilter;
+    public SecurityConfig(JwtFilter jwtFilter) { this.jwtFilter = jwtFilter; }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf().disable()
+            .authorizeHttpRequests()
+            .antMatchers("/api/auth/**").permitAll()
+            .anyRequest().authenticated()
+            .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+}
+
+// --- CONTROLLER: AuthController.java ---
+package com.example.elearning.controller;
+
+import com.example.elearning.model.User;
+import com.example.elearning.repository.UserRepository;
+import com.example.elearning.security.JwtUtil;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+    private final UserRepository userRepo;
+    private final PasswordEncoder encoder;
+    private final JwtUtil jwtUtil;
+    public AuthController(UserRepository userRepo, PasswordEncoder encoder, JwtUtil jwtUtil) {
+        this.userRepo=userRepo; this.encoder=encoder; this.jwtUtil=jwtUtil;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user){
+        if(userRepo.findByEmail(user.getEmail()).isPresent())
+            return ResponseEntity.badRequest().body("Email already exists");
+        user.setPassword(encoder.encode(user.getPassword()));
+        userRepo.save(user);
+        return ResponseEntity.ok("Registered");
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody User login){
+        return userRepo.findByEmail(login.getEmail())
+            .filter(u->encoder.matches(login.getPassword(),u.getPassword()))
+            .map(u->ResponseEntity.ok(jwtUtil.generateToken(u.getEmail(),u.getRole())))
+            .orElse(ResponseEntity.status(401).body("Invalid creds"));
+    }
+}
+
+// --- CONTROLLER: CourseController.java ---
+package com.example.elearning.controller;
+
+import com.example.elearning.model.Course;
+import com.example.elearning.model.Lecture;
+import com.example.elearning.repository.CourseRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/courses")
+public class CourseController {
+    private final CourseRepository repo;
+    public CourseController(CourseRepository repo){ this.repo=repo; }
+
+    @PostMapping
+    public Course create(@RequestBody Course course){ return repo.save(course); }
+
+    @GetMapping
+    public List<Course> list(){ return repo.findAll(); }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Course> get(@PathVariable String id){
+        return repo.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/lectures")
+    public ResponseEntity<Course> addLecture(@PathVariable String id, @RequestBody Lecture lec){
+        return repo.findById(id).map(c->{ c.getLectures().add(lec); return ResponseEntity.ok(repo.save(c)); })
+            .orElse(ResponseEntity.notFound().build());
+    }
+}
+
+// --- SAMPLE UNIT TEST: AuthControllerTest.java ---
+package com.example.elearning;
+
+import com.example.elearning.controller.AuthController;
+import com.example.elearning.model.User;
+import com.example.elearning.repository.UserRepository;
+import com.example.elearning.security.JwtUtil;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Optional;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class AuthControllerTest {
+    @Test void loginSuccess() {
+        User u=new User("Test","t@mail.com","hash","STUDENT");
+        UserRepository repo=Mockito.mock(UserRepository.class);
+        PasswordEncoder enc=Mockito.mock(PasswordEncoder.class);
+        JwtUtil jwt=new JwtUtil();
+        Mockito.when(repo.findByEmail("t@mail.com")).thenReturn(Optional.of(u));
+        Mockito.when(enc.matches("pass","hash")).thenReturn(true);
+        AuthController c=new AuthController(repo,enc,jwt);
+        ResponseEntity<?> resp=c.login(new User(null,"t@mail.com","pass",null));
+        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+    }
+}
+
+// -----------------------------------
+// 2. FRONTEND (Angular)
+// -----------------------------------
+
+// Folder: frontend/src/app/
+
+// --- app.module.ts ---
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { NgModule } from '@angular/core';
+import { ReactiveFormsModule } from '@angular/forms';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppComponent } from './app.component';
+import { LoginComponent } from './auth/login/login.component';
+import { RegisterComponent } from './auth/register/register.component';
+import { CourseListComponent } from './courses/course-list/course-list.component';
+import { CourseFormComponent } from './courses/course-form/course-form.component';
+import { AuthInterceptor } from './services/auth.interceptor';
+import { AppRoutingModule } from './app-routing.module';
+
+@NgModule({
+  declarations: [AppComponent, LoginComponent, RegisterComponent, CourseListComponent, CourseFormComponent],
+  imports: [BrowserModule, HttpClientModule, ReactiveFormsModule, AppRoutingModule],
+  providers: [{provide: HTTP_INTERCEPTORS,useClass: AuthInterceptor,multi:true}],
+  bootstrap: [AppComponent]
+}) export class AppModule {}
+
+// --- auth.interceptor.ts ---
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler } from '@angular/common/http';
+@Injectable() export class AuthInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<any>, next: HttpHandler) {
+    const token = localStorage.getItem('token');
+    if (token) req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+    return next.handle(req);
+  }
+}
+
+// --- login.component.ts ---
+import { Component } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+@Component({ selector:'app-login', templateUrl:'./login.component.html', styleUrls:['./login.component.css'] })
+export class LoginComponent {
+  form = this.fb.group({ email:['',Validators.required], password:['',Validators.required] });
+  constructor(private fb:FormBuilder,private http:HttpClient,private router:Router){}
+  login(){ this.http.post<any>('/api/auth/login',this.form.value).subscribe(r=>{ localStorage.setItem('token',r); this.router.navigate(['/courses']); }); }
+}
+
+// --- login.component.html ---
+/*
+<form [formGroup]="form" (ngSubmit)="login()">
+  <input formControlName="email" placeholder="Email">
+  <input type="password" formControlName="password" placeholder="Password">
+  <button type="submit">Login</button>
+</form>
+*/
+
+// --- login.component.css ---
+/*
+form { max-width:300px; margin:auto; display:flex; flex-direction:column; }
+input,button{ margin:8px 0; padding:8px; }
+*/
+
+// --- register.component.ts (similar to login) ---
+// --- course-list.component.ts ---
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+@Component({ selector:'app-course-list', templateUrl:'./course-list.component.html' })
+export class CourseListComponent implements OnInit {
+  courses:any[]=[];
+  constructor(private http:HttpClient){}
+  ngOnInit(){ this.http.get<any[]>('/api/courses').subscribe(data=>this.courses=data); }
+}
+
+// --- course-list.component.html ---
+/*
+<div *ngFor="let c of courses">
+  <h2>{{c.title}}</h2>
+  <p>{{c.description}}</p>
+</div>
+*/
+
+// --- course-form.component.ts ---
+import { Component } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+@Component({ selector:'app-course-form', templateUrl:'./course-form.component.html' })
+export class CourseFormComponent {
+  form = this.fb.group({ title:['',Validators.required], description:[''] });
+  constructor(private fb:FormBuilder,private http:HttpClient,private router:Router){}
+  save(){ this.http.post('/api/courses',this.form.value).subscribe(()=>this.router.navigate(['/courses'])); }
+}
+
+// --- course-form.component.html ---
+/*
+<form [formGroup]="form" (ngSubmit)="save()">
+  <input formControlName="title" placeholder="Title">
+  <textarea formControlName="description" placeholder="Description"></textarea>
+  <button type="submit">Save</button>
+</form>
+*/
+
+// --- app-routing.module.ts ---
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { LoginComponent } from './auth/login/login.component';
+import { RegisterComponent } from './auth/register/register.component';
+import { CourseListComponent } from './courses/course-list/course-list.component';
+import { CourseFormComponent } from './courses/course-form/course-form.component';
+
+const routes: Routes = [
+  { path: 'login', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'courses', component: CourseListComponent },
+  { path: 'courses/new', component: CourseFormComponent },
+  { path: '', redirectTo: '/login', pathMatch: 'full' }
+];
+
+@NgModule({ imports: [RouterModule.forRoot(routes)], exports: [RouterModule] }) export class AppRoutingModule {}
+
+
+I’ve updated the canvas with the complete codebase:
+
+Spring Boot Backend (no DTOs):
+
+User, Course, Lecture models (with @JsonIgnore on sensitive fields)
+
+Repositories
+
+JWT-based security (JwtUtil, JwtFilter, SecurityConfig)
+
+AuthController (register/login) and CourseController (CRUD + add lectures)
+
+Sample JUnit test for authentication
+
+Actuator and MongoDB config
+
+
+Angular Frontend (separate .ts/.html/.css):
+
+Modules: Auth (login/register), Courses (list, create)
+
+Reactive forms, HTTP interceptor for JWT
+
+Routing setup
+
+
+
+Let me know if you need any further tweaks (tests coverage, file uploads, UI styling enhancements, etc.).
+
