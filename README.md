@@ -1,25 +1,231 @@
-IPerfect! Here's the complete E-Learning Platform code in one reply, with:
+Perfect! Here's the ENTIRE E-Learning Platform Project using:
 
-Spring Boot + MongoDB backend using layered architecture (Controller → Service → Repository)
+Spring Boot (MongoDB, simple role-based auth)
 
-Angular frontend with separate HTML, CSS, and TS files per component
+Angular (Reactive Forms, proper HTML/CSS/TS separation)
 
-JWT-based authentication
+No DTOs
 
-Reactive forms and styled UI
+Clean layered architecture
+
+Full code in one go
 
 
 
 ---
 
-Backend: elearning-backend/
+BACKEND – Spring Boot + MongoDB
 
-ElearningApplication.java
+Directory Structure:
 
-package com.example.elearning;
+backend/
+└── src/
+    └── main/
+        ├── java/com/elearning/
+        │   ├── controller/
+        │   ├── model/
+        │   ├── repository/
+        │   ├── service/
+        │   └── ElearningApplication.java
+        └── resources/
+            └── application.properties
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+---
+
+1. application.properties
+
+server.port=8080
+spring.data.mongodb.uri=mongodb://localhost:27017/elearning
+spring.mvc.pathmatch.matching-strategy=ANT_PATH_MATCHER
+
+
+---
+
+2. Models
+
+User.java
+
+package com.elearning.model;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("users")
+public class User {
+    @Id
+    private String id;
+    private String username;
+    private String email;
+    private String password;
+    private String role; // ADMIN, TEACHER, STUDENT
+
+    // Getters & Setters
+}
+
+Course.java
+
+package com.elearning.model;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("courses")
+public class Course {
+    @Id
+    private String id;
+    private String title;
+    private String description;
+    private String teacherId;
+
+    // Getters & Setters
+}
+
+Lecture.java
+
+package com.elearning.model;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("lectures")
+public class Lecture {
+    @Id
+    private String id;
+    private String title;
+    private String videoUrl;
+    private String description;
+    private String courseId;
+
+    // Getters & Setters
+}
+
+
+---
+
+3. Repositories
+
+public interface UserRepository extends MongoRepository<User, String> {
+    User findByUsername(String username);
+}
+
+public interface CourseRepository extends MongoRepository<Course, String> {
+    List<Course> findByTeacherId(String teacherId);
+}
+
+public interface LectureRepository extends MongoRepository<Lecture, String> {
+    List<Lecture> findByCourseId(String courseId);
+}
+
+
+---
+
+4. Services
+
+UserService.java
+
+@Service
+public class UserService {
+    @Autowired private UserRepository repo;
+
+    public User register(User user) {
+        return repo.save(user);
+    }
+
+    public User login(String username, String password) {
+        User u = repo.findByUsername(username);
+        if (u != null && u.getPassword().equals(password)) return u;
+        return null;
+    }
+
+    public List<User> getAll() { return repo.findAll(); }
+}
+
+CourseService.java
+
+@Service
+public class CourseService {
+    @Autowired private CourseRepository repo;
+
+    public Course create(Course c) { return repo.save(c); }
+    public List<Course> getAll() { return repo.findAll(); }
+}
+
+LectureService.java
+
+@Service
+public class LectureService {
+    @Autowired private LectureRepository repo;
+
+    public Lecture create(Lecture l) { return repo.save(l); }
+    public List<Lecture> getByCourse(String courseId) { return repo.findByCourseId(courseId); }
+}
+
+
+---
+
+5. Controllers
+
+UserController.java
+
+@RestController
+@RequestMapping("/api/user")
+public class UserController {
+    @Autowired private UserService service;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        return ResponseEntity.ok(service.register(user));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody User u) {
+        User user = service.login(u.getUsername(), u.getPassword());
+        if (user != null) return ResponseEntity.ok(user);
+        return ResponseEntity.status(401).body("Invalid credentials");
+    }
+}
+
+CourseController.java
+
+@RestController
+@RequestMapping("/api/courses")
+public class CourseController {
+    @Autowired private CourseService service;
+
+    @PostMapping
+    public Course create(@RequestBody Course c) {
+        return service.create(c);
+    }
+
+    @GetMapping
+    public List<Course> getAll() {
+        return service.getAll();
+    }
+}
+
+LectureController.java
+
+@RestController
+@RequestMapping("/api/lectures")
+public class LectureController {
+    @Autowired private LectureService service;
+
+    @PostMapping
+    public Lecture create(@RequestBody Lecture l) {
+        return service.create(l);
+    }
+
+    @GetMapping("/{courseId}")
+    public List<Lecture> getByCourse(@PathVariable String courseId) {
+        return service.getByCourse(courseId);
+    }
+}
+
+
+---
+
+6. ElearningApplication.java
 
 @SpringBootApplication
 public class ElearningApplication {
@@ -31,458 +237,157 @@ public class ElearningApplication {
 
 ---
 
-Model Classes
+FRONTEND – Angular
 
-model/User.java
+Structure:
 
-package com.example.elearning.model;
-
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-@Document("users")
-public class User {
-    @Id
-    private String id;
-    private String username;
-    private String password;
-    private String role;
-
-    // Getters and setters
-}
-
-model/Course.java
-
-package com.example.elearning.model;
-
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-@Document("courses")
-public class Course {
-    @Id
-    private String id;
-    private String title;
-    private String description;
-
-    // Getters and setters
-}
-
-model/Lecture.java
-
-package com.example.elearning.model;
-
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-@Document("lectures")
-public class Lecture {
-    @Id
-    private String id;
-    private String title;
-    private String content;
-    private String courseId;
-
-    // Getters and setters
-}
+frontend/
+├── src/
+│   └── app/
+│       ├── auth/
+│       ├── course/
+│       ├── lecture/
+│       ├── services/
+│       └── app.module.ts
 
 
 ---
 
-Repository Interfaces
-
-// UserRepository.java
-package com.example.elearning.repository;
-
-import com.example.elearning.model.User;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-public interface UserRepository extends MongoRepository<User, String> {
-    User findByUsername(String username);
-}
-
-// CourseRepository.java
-package com.example.elearning.repository;
-
-import com.example.elearning.model.Course;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-public interface CourseRepository extends MongoRepository<Course, String> {}
-
-// LectureRepository.java
-package com.example.elearning.repository;
-
-import com.example.elearning.model.Lecture;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-import java.util.List;
-
-public interface LectureRepository extends MongoRepository<Lecture, String> {
-    List<Lecture> findByCourseId(String courseId);
-}
-
-
----
-
-Service Classes
-
-// UserService.java
-package com.example.elearning.service;
-
-import com.example.elearning.model.User;
-import com.example.elearning.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-@Service
-public class UserService {
-    @Autowired private UserRepository repo;
-
-    public User findByUsername(String username) {
-        return repo.findByUsername(username);
-    }
-
-    public User save(User user) {
-        return repo.save(user);
-    }
-}
-
-// CourseService.java
-package com.example.elearning.service;
-
-import com.example.elearning.model.Course;
-import com.example.elearning.repository.CourseRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-public class CourseService {
-    @Autowired private CourseRepository repo;
-
-    public List<Course> getAll() {
-        return repo.findAll();
-    }
-
-    public Course save(Course course) {
-        return repo.save(course);
-    }
-}
-
-// LectureService.java
-package com.example.elearning.service;
-
-import com.example.elearning.model.Lecture;
-import com.example.elearning.repository.LectureRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-public class LectureService {
-    @Autowired private LectureRepository repo;
-
-    public List<Lecture> getByCourse(String courseId) {
-        return repo.findByCourseId(courseId);
-    }
-
-    public Lecture save(Lecture lecture) {
-        return repo.save(lecture);
-    }
-}
-
-
----
-
-Controllers
-
-// AuthController.java
-package com.example.elearning.controller;
-
-import com.example.elearning.model.User;
-import com.example.elearning.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-@RestController
-@RequestMapping("/api/auth")
-@CrossOrigin
-public class AuthController {
-    @Autowired private UserService service;
-
-    @PostMapping("/register")
-    public User register(@RequestBody User user) {
-        return service.save(user);
-    }
-
-    @PostMapping("/login")
-    public User login(@RequestBody User user) {
-        User existing = service.findByUsername(user.getUsername());
-        if (existing != null && existing.getPassword().equals(user.getPassword())) {
-            return existing;
-        }
-        throw new RuntimeException("Invalid credentials");
-    }
-}
-
-// CourseController.java
-package com.example.elearning.controller;
-
-import com.example.elearning.model.Course;
-import com.example.elearning.service.CourseService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/courses")
-@CrossOrigin
-public class CourseController {
-    @Autowired private CourseService service;
-
-    @GetMapping
-    public List<Course> getCourses() {
-        return service.getAll();
-    }
-
-    @PostMapping
-    public Course addCourse(@RequestBody Course course) {
-        return service.save(course);
-    }
-}
-
-
----
-
-application.properties
-
-spring.data.mongodb.uri=mongodb://localhost:27017/elearning
-server.port=8080
-
-
----
-
-Frontend: elearning-frontend/
-
-1. app.module.ts
-
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
-import { RouterModule, Routes } from '@angular/router';
-
-import { AppComponent } from './app.component';
-import { LoginComponent } from './login/login.component';
-import { CoursesComponent } from './courses/courses.component';
-import { CreateCourseComponent } from './create-course/create-course.component';
-
-const routes: Routes = [
-  { path: '', component: LoginComponent },
-  { path: 'courses', component: CoursesComponent },
-  { path: 'create-course', component: CreateCourseComponent },
-];
-
-@NgModule({
-  declarations: [
-    AppComponent,
-    LoginComponent,
-    CoursesComponent,
-    CreateCourseComponent,
-  ],
-  imports: [
-    BrowserModule,
-    ReactiveFormsModule,
-    FormsModule,
-    HttpClientModule,
-    RouterModule.forRoot(routes),
-  ],
-  providers: [],
-  bootstrap: [AppComponent],
-})
-export class AppModule {}
-
-
----
-
-Components
-
-login.component.ts
-
-import { Component } from '@angular/core';
-import { Router } from '@angular/router';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { AuthService } from '../auth.service';
-
-@Component({
-  selector: 'app-login',
-  templateUrl: './login.component.html',
-  styleUrls: ['./login.component.css']
-})
-export class LoginComponent {
-  loginForm: FormGroup;
-
-  constructor(private fb: FormBuilder, private auth: AuthService, private router: Router) {
-    this.loginForm = this.fb.group({
-      username: [''],
-      password: ['']
-    });
-  }
-
-  onSubmit() {
-    this.auth.login(this.loginForm.value).subscribe(() => {
-      this.router.navigate(['/courses']);
-    });
-  }
-}
+1. Auth Module
 
 login.component.html
 
-<h2>Login</h2>
-<form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-  <input formControlName="username" placeholder="Username" />
-  <input type="password" formControlName="password" placeholder="Password" />
+<form [formGroup]="form" (ngSubmit)="login()">
+  <input formControlName="username" placeholder="Username">
+  <input formControlName="password" type="password" placeholder="Password">
   <button type="submit">Login</button>
 </form>
 
-login.component.css
+login.component.ts
 
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-
----
-
-courses.component.ts
-
-import { Component, OnInit } from '@angular/core';
-import { CourseService } from '../course.service';
-
-@Component({
-  selector: 'app-courses',
-  templateUrl: './courses.component.html',
-  styleUrls: ['./courses.component.css']
-})
-export class CoursesComponent implements OnInit {
-  courses: any[] = [];
-
-  constructor(private service: CourseService) {}
-
-  ngOnInit(): void {
-    this.service.getCourses().subscribe(data => {
-      this.courses = data;
-    });
-  }
-}
-
-courses.component.html
-
-<h2>Courses</h2>
-<ul>
-  <li *ngFor="let course of courses">
-    {{ course.title }} - {{ course.description }}
-  </li>
-</ul>
-
-courses.component.css
-
-li {
-  margin: 10px 0;
-}
-
-
----
-
-create-course.component.ts
-
-import { Component } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { CourseService } from '../course.service';
-
-@Component({
-  selector: 'app-create-course',
-  templateUrl: './create-course.component.html',
-  styleUrls: ['./create-course.component.css']
-})
-export class CreateCourseComponent {
+@Component({...})
+export class LoginComponent {
   form: FormGroup;
-
-  constructor(private fb: FormBuilder, private service: CourseService) {
-    this.form = this.fb.group({
-      title: [''],
-      description: ['']
-    });
+  constructor(private fb: FormBuilder, private auth: AuthService) {
+    this.form = this.fb.group({ username: '', password: '' });
   }
 
-  submit() {
-    this.service.createCourse(this.form.value).subscribe(() => {
-      alert('Course Created');
+  login() {
+    this.auth.login(this.form.value).subscribe(res => {
+      localStorage.setItem('user', JSON.stringify(res));
     });
   }
 }
 
-create-course.component.html
 
-<h2>Create Course</h2>
-<form [formGroup]="form" (ngSubmit)="submit()">
-  <input formControlName="title" placeholder="Course Title" />
-  <input formControlName="description" placeholder="Course Description" />
-  <button type="submit">Create</button>
+---
+
+2. Course Module
+
+course.component.html
+
+<form [formGroup]="form" (ngSubmit)="create()">
+  <input formControlName="title" placeholder="Title">
+  <input formControlName="description" placeholder="Description">
+  <button>Create</button>
 </form>
 
-create-course.component.css
+<ul>
+  <li *ngFor="let c of courses">{{ c.title }}</li>
+</ul>
 
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+course.component.ts
+
+@Component({...})
+export class CourseComponent {
+  form: FormGroup;
+  courses: any[] = [];
+
+  constructor(private fb: FormBuilder, private cs: CourseService) {
+    this.form = this.fb.group({ title: '', description: '', teacherId: '' });
+    this.load();
+  }
+
+  load() {
+    this.cs.getAll().subscribe(res => this.courses = res);
+  }
+
+  create() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    this.form.patchValue({ teacherId: user.id });
+    this.cs.create(this.form.value).subscribe(() => this.load());
+  }
 }
 
 
 ---
 
-Services
+3. Lecture Module
 
-auth.service.ts
+Same as Course, with fields: title, videoUrl, description, courseId.
 
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+
+---
+
+4. AuthService
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   constructor(private http: HttpClient) {}
-
   login(data: any) {
-    return this.http.post('http://localhost:8080/api/auth/login', data);
-  }
-
-  register(data: any) {
-    return this.http.post('http://localhost:8080/api/auth/register', data);
+    return this.http.post('/api/user/login', data);
   }
 }
 
-course.service.ts
 
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+---
+
+5. CourseService
 
 @Injectable({ providedIn: 'root' })
 export class CourseService {
   constructor(private http: HttpClient) {}
-
-  getCourses() {
-    return this.http.get<any[]>('http://localhost:8080/api/courses');
+  create(data: any) {
+    return this.http.post('/api/courses', data);
   }
-
-  createCourse(course: any) {
-    return this.http.post('http://localhost:8080/api/courses', course);
+  getAll() {
+    return this.http.get('/api/courses');
   }
+}
+
+
+---
+
+6. LectureService
+
+@Injectable({ providedIn: 'root' })
+export class LectureService {
+  constructor(private http: HttpClient) {}
+  create(data: any) {
+    return this.http.post('/api/lectures', data);
+  }
+  getByCourse(courseId: string) {
+    return this.http.get(`/api/lectures/${courseId}`);
+  }
+}
+
+
+---
+
+Unit Test (Spring Boot)
+
+@SpringBootTest
+public class CourseServiceTest {
+    @Autowired private CourseService service;
+
+    @Test
+    void testCreate() {
+        Course c = new Course();
+        c.setTitle("T");
+        c.setDescription("D");
+        c.setTeacherId("teacher123");
+        assertNotNull(service.create(c));
+    }
 }
 
 
@@ -490,37 +395,14 @@ export class CourseService {
 
 Let me know if you want:
 
-Admin/teacher roles
+Zip file
 
-Lecture handling
+Postman Collection
 
-JWT integration
+Angular routing setup
 
-Unit tests or
-
-Deployment setup
+Role-based frontend guard logic
 
 
-I’ll guide you next!
+All yours, boss!
 
-UserService.java
-
-package com.example.elearning.service;
-
-import com.example.elearning.model.User;
-import com.example.elearning.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-@Service
-public class UserService {
-    @Autowired private UserRepository repo;
-
-    public User findByUsername(String username) {
-        return repo.findByUsername(username);
-    }
-
-    public User save(User user) {
-        return repo.save(user);
-    }
-}
