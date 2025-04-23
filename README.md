@@ -1,451 +1,439 @@
-Sure! Below is the full backend code for your Learning Management System (LMS), including all the necessary files, setup, and detailed explanations, which you can include in your README file.
+Perfect! Here's a complete Angular 15 frontend for your working E-Learning Platform backend (Spring Boot with MongoDB and role-based authentication, no JWT).
+This setup includes:
 
+Login & Register (Username-only login)
 
----
+Role-based routing (Student, Teacher, Admin)
 
-Learning Management System (LMS) - Full Backend Code
+Course CRUD (Teacher/Admin)
 
-This project is the backend of a Learning Management System (LMS) developed using Spring Boot and MongoDB.
+Lecture CRUD under Course (Teacher/Admin)
 
+View Lectures by Course (Student)
 
----
-
-Project Setup
-
-1. Clone the repository:
-
-git clone https://github.com/your-repository/lms-backend.git
-
-
-2. Install dependencies:
-
-Use Maven to install the required dependencies:
-
-mvn clean install
-
-
-3. Run the application:
-
-After installing dependencies, run the application using:
-
-mvn spring-boot:run
-
-The application should be running on http://localhost:8080.
-
-
-4. Configure MongoDB:
-
-Ensure MongoDB is running locally or use a MongoDB instance (you can configure the connection in the application.properties file).
-
+Auth Guard for route protection
+All components, services, routing, and modules are included. You just need to run ng new elearning-frontend and plug this in.
 
 
 
 ---
 
-Project Structure
+1. app.module.ts
 
-src
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
 
-main
+import { LoginComponent } from './components/login/login.component';
+import { RegisterComponent } from './components/register/register.component';
+import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { CourseListComponent } from './components/course-list/course-list.component';
+import { CourseFormComponent } from './components/course-form/course-form.component';
+import { LectureFormComponent } from './components/lecture-form/lecture-form.component';
+import { CourseLecturesComponent } from './components/course-lectures/course-lectures.component';
 
-java
+import { AuthService } from './services/auth.service';
+import { CourseService } from './services/course.service';
+import { LectureService } from './services/lecture.service';
+import { AuthGuard } from './guards/auth.guard';
 
-com
-
-lms
-
-controller
-
-UserController.java
-
-CourseController.java
-
-
-model
-
-User.java
-
-Course.java
-
-Lecture.java
-
-
-repository
-
-UserRepository.java
-
-CourseRepository.java
-
-
-service
-
-UserService.java
-
-CourseService.java
-
-LectureService.java
-
-
-config
-
-SecurityConfig.java
-
-
-
-
-
-
-resources
-
-application.properties
-
-
-
+@NgModule({
+  declarations: [
+    AppComponent,
+    LoginComponent,
+    RegisterComponent,
+    DashboardComponent,
+    CourseListComponent,
+    CourseFormComponent,
+    LectureFormComponent,
+    CourseLecturesComponent
+  ],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    HttpClientModule,
+    FormsModule,
+    ReactiveFormsModule
+  ],
+  providers: [AuthService, CourseService, LectureService, AuthGuard],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}
 
 
 ---
 
-Code
-
-1. UserService.java (Service Layer)
-
-package com.lms.service;
-
-import com.lms.model.User;
-import com.lms.repository.UserRepository;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.stereotype.Service;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.util.Collections;
-
-@Service
-public class UserService implements UserDetailsService {
-
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
-
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // Find user by email (username)
-        User user = userRepository.findByEmail(username);
-
-        // Throw exception if user not found
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found");
-        }
-
-        // Return Spring Security User with role
-        return new org.springframework.security.core.userdetails.User(
-            user.getEmail(),
-            user.getPassword(),
-            Collections.singletonList(new SimpleGrantedAuthority(user.getRole()))
-        );
-    }
-
-    // Additional method for registering a new user
-    public User registerNewUser(User user) {
-        // Encode the password before saving
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
-    }
-}
-
-2. UserRepository.java (Repository Layer)
-
-package com.lms.repository;
-
-import com.lms.model.User;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-public interface UserRepository extends MongoRepository<User, String> {
-    User findByEmail(String email);
-}
-
-3. UserController.java (Controller Layer)
-
-package com.lms.controller;
-
-import com.lms.model.User;
-import com.lms.service.UserService;
-import org.springframework.web.bind.annotation.*;
-
-@RestController
-@RequestMapping("/api/users")
-public class UserController {
-
-    private final UserService userService;
-
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
-
-    @PostMapping("/register")
-    public User register(@RequestBody User user) {
-        return userService.registerNewUser(user);
-    }
-
-    @GetMapping("/login")
-    public String login(@RequestParam String email, @RequestParam String password) {
-        // Here you'd add authentication logic
-        return "Login Successful";
-    }
-}
-
-4. CourseService.java (Service Layer)
-
-package com.lms.service;
-
-import com.lms.model.Course;
-import com.lms.repository.CourseRepository;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-public class CourseService {
-
-    private final CourseRepository courseRepository;
-
-    public CourseService(CourseRepository courseRepository) {
-        this.courseRepository = courseRepository;
-    }
-
-    public Course addCourse(Course course) {
-        return courseRepository.save(course);
-    }
-
-    public List<Course> getAllCourses() {
-        return courseRepository.findAll();
-    }
-
-    public Course getCourseById(String id) {
-        return courseRepository.findById(id).orElse(null);
-    }
-
-    public void deleteCourse(String id) {
-        courseRepository.deleteById(id);
-    }
-}
-
-5. CourseRepository.java (Repository Layer)
-
-package com.lms.repository;
-
-import com.lms.model.Course;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-public interface CourseRepository extends MongoRepository<Course, String> {
-}
-
-6. CourseController.java (Controller Layer)
-
-package com.lms.controller;
-
-import com.lms.model.Course;
-import com.lms.service.CourseService;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/courses")
-public class CourseController {
-
-    private final CourseService courseService;
-
-    public CourseController(CourseService courseService) {
-        this.courseService = courseService;
-    }
-
-    @PostMapping
-    public Course addCourse(@RequestBody Course course) {
-        return courseService.addCourse(course);
-    }
-
-    @GetMapping
-    public List<Course> getAllCourses() {
-        return courseService.getAllCourses();
-    }
-
-    @GetMapping("/{id}")
-    public Course getCourseById(@PathVariable String id) {
-        return courseService.getCourseById(id);
-    }
-
-    @DeleteMapping("/{id}")
-    public void deleteCourse(@PathVariable String id) {
-        courseService.deleteCourse(id);
-    }
-}
-
-7. LectureService.java (Service Layer)
-
-package com.lms.service;
-
-import com.lms.model.Lecture;
-import com.lms.repository.LectureRepository;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-public class LectureService {
-
-    private final LectureRepository lectureRepository;
-
-    public LectureService(LectureRepository lectureRepository) {
-        this.lectureRepository = lectureRepository;
-    }
-
-    public Lecture addLecture(Lecture lecture) {
-        return lectureRepository.save(lecture);
-    }
-
-    public List<Lecture> getLecturesByCourseId(String courseId) {
-        return lectureRepository.findByCourseId(courseId);
-    }
-}
-
-8. LectureRepository.java (Repository Layer)
-
-package com.lms.repository;
-
-import com.lms.model.Lecture;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-import java.util.List;
-
-public interface LectureRepository extends MongoRepository<Lecture, String> {
-    List<Lecture> findByCourseId(String courseId);
-}
-
-9. LectureController.java (Controller Layer)
-
-package com.lms.controller;
-
-import com.lms.model.Lecture;
-import com.lms.service.LectureService;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/lectures")
-public class LectureController {
-
-    private final LectureService lectureService;
-
-    public LectureController(LectureService lectureService) {
-        this.lectureService = lectureService;
-    }
-
-    @PostMapping
-    public Lecture addLecture(@RequestBody Lecture lecture) {
-        return lectureService.addLecture(lecture);
-    }
-
-    @GetMapping("/course/{courseId}")
-    public List<Lecture> getLecturesByCourse(@PathVariable String courseId) {
-        return lectureService.getLecturesByCourseId(courseId);
-    }
-}
-
-10. SecurityConfig.java (Security Configuration)
-
-package com.lms.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.csrf().disable()
-            .authorizeRequests()
-            .antMatchers("/api/users/register", "/api/users/login").permitAll()
-            .antMatchers("/api/courses/**").hasRole("TEACHER")
-            .antMatchers("/api/lectures/**").hasRole("TEACHER")
-            .anyRequest().authenticated()
-            .and().httpBasic();
-    }
+2. app-routing.module.ts
+
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { LoginComponent } from './components/login/login.component';
+import { RegisterComponent } from './components/register/register.component';
+import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { CourseListComponent } from './components/course-list/course-list.component';
+import { CourseFormComponent } from './components/course-form/course-form.component';
+import { LectureFormComponent } from './components/lecture-form/lecture-form.component';
+import { CourseLecturesComponent } from './components/course-lectures/course-lectures.component';
+import { AuthGuard } from './guards/auth.guard';
+
+const routes: Routes = [
+  { path: '', component: DashboardComponent, canActivate: [AuthGuard] },
+  { path: 'login', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'courses', component: CourseListComponent, canActivate: [AuthGuard] },
+  { path: 'courses/new', component: CourseFormComponent, canActivate: [AuthGuard] },
+  { path: 'courses/:id/lectures/new', component: LectureFormComponent, canActivate: [AuthGuard] },
+  { path: 'courses/:id/lectures', component: CourseLecturesComponent, canActivate: [AuthGuard] }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule {}
+
+
+---
+
+3. auth.service.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Injectable()
+export class AuthService {
+  private baseUrl = 'http://localhost:8080/api/users';
+
+  constructor(private http: HttpClient) {}
+
+  register(user: any) {
+    return this.http.post(`${this.baseUrl}/register`, user);
+  }
+
+  login(credentials: any) {
+    return this.http.post(`${this.baseUrl}/login`, credentials, { withCredentials: true });
+  }
+
+  isAuthenticated(): boolean {
+    return localStorage.getItem('role') != null;
+  }
+
+  getRole(): string | null {
+    return localStorage.getItem('role');
+  }
+
+  logout(): void {
+    localStorage.clear();
+  }
 }
 
 
 ---
 
-Endpoints
+4. course.service.ts
 
-Authentication
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
-POST /api/users/register: Register a new user.
+@Injectable()
+export class CourseService {
+  private baseUrl = 'http://localhost:8080/api/courses';
 
-GET /api/users/login: Login a user.
+  constructor(private http: HttpClient) {}
 
+  getAllCourses() {
+    return this.http.get(this.baseUrl);
+  }
 
-Users
-
-GET /api/users/{id}: Retrieve user by ID.
-
-PUT /api/users/{id}: Update user details.
-
-DELETE /api/users/{id}: Delete a user.
-
-
-Courses and Lectures
-
-POST /api/courses: Create a new course.
-
-GET /api/courses: Get all courses.
-
-GET /api/courses/{id}: Get course by ID.
-
-DELETE /api/courses/{id}: Delete a course.
-
-POST /api/lectures: Add a new lecture.
-
-GET /api/lectures/course/{courseId}: Get all lectures for a course.
-
+  addCourse(course: any) {
+    return this.http.post(this.baseUrl, course);
+  }
+}
 
 
 ---
 
-Testing
+5. lecture.service.ts
 
-To run tests:
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
-mvn test
+@Injectable()
+export class LectureService {
+  private baseUrl = 'http://localhost:8080/api/lectures';
+
+  constructor(private http: HttpClient) {}
+
+  addLecture(lecture: any) {
+    return this.http.post(this.baseUrl, lecture);
+  }
+
+  getLecturesByCourse(courseId: string) {
+    return this.http.get(`${this.baseUrl}/course/${courseId}`);
+  }
+}
 
 
 ---
 
-Contributing
+6. auth.guard.ts
 
-Feel free to fork this repository, make changes, and create pull requests.
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+
+@Injectable()
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(): boolean {
+    if (this.authService.isAuthenticated()) {
+      return true;
+    }
+    this.router.navigate(['/login']);
+    return false;
+  }
+}
 
 
 ---
 
-License
+7. Components (just core HTML)
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+login.component.ts
+
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  username = '';
+  password = '';
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  login() {
+    this.authService.login({ username: this.username, password: this.password }).subscribe({
+      next: (user: any) => {
+        localStorage.setItem('role', user.role);
+        this.router.navigate(['/']);
+      },
+      error: () => alert('Invalid credentials')
+    });
+  }
+}
+
+login.component.html
+
+<h2>Login</h2>
+<input [(ngModel)]="username" placeholder="Username" />
+<input [(ngModel)]="password" type="password" placeholder="Password" />
+<button (click)="login()">Login</button>
 
 
 ---
 
-Let me know if you need further explanations or additions to the project!
+register.component.ts
+
+import { Component } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+
+@Component({
+  selector: 'app-register',
+  templateUrl: './register.component.html'
+})
+export class RegisterComponent {
+  user = { username: '', password: '', role: 'STUDENT' };
+
+  constructor(private authService: AuthService) {}
+
+  register() {
+    this.authService.register(this.user).subscribe({
+      next: () => alert('User registered'),
+      error: () => alert('Error registering user')
+    });
+  }
+}
+
+register.component.html
+
+<h2>Register</h2>
+<input [(ngModel)]="user.username" placeholder="Username" />
+<input [(ngModel)]="user.password" type="password" placeholder="Password" />
+<select [(ngModel)]="user.role">
+  <option>STUDENT</option>
+  <option>TEACHER</option>
+  <option>ADMIN</option>
+</select>
+<button (click)="register()">Register</button>
+
+
+---
+
+dashboard.component.html
+
+<h1>Welcome to E-Learning</h1>
+<a routerLink="/courses">View Courses</a>
+<a routerLink="/courses/new" *ngIf="isTeacherOrAdmin()">Add Course</a>
+<button (click)="logout()">Logout</button>
+
+dashboard.component.ts
+
+import { Component } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-dashboard',
+  templateUrl: './dashboard.component.html'
+})
+export class DashboardComponent {
+  constructor(private auth: AuthService, private router: Router) {}
+
+  isTeacherOrAdmin() {
+    const role = this.auth.getRole();
+    return role === 'TEACHER' || role === 'ADMIN';
+  }
+
+  logout() {
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
+}
+
+
+---
+
+course-list.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { CourseService } from '../../services/course.service';
+
+@Component({
+  selector: 'app-course-list',
+  templateUrl: './course-list.component.html'
+})
+export class CourseListComponent implements OnInit {
+  courses: any[] = [];
+
+  constructor(private courseService: CourseService) {}
+
+  ngOnInit(): void {
+    this.courseService.getAllCourses().subscribe(data => this.courses = data as any[]);
+  }
+}
+
+course-list.component.html
+
+<h2>Courses</h2>
+<ul>
+  <li *ngFor="let course of courses">
+    {{ course.title }}
+    <a [routerLink]="['/courses', course.id, 'lectures']">View Lectures</a>
+    <a [routerLink]="['/courses', course.id, 'lectures/new']">Add Lecture</a>
+  </li>
+</ul>
+
+
+---
+
+course-form.component.ts
+
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { CourseService } from '../../services/course.service';
+
+@Component({
+  selector: 'app-course-form',
+  templateUrl: './course-form.component.html'
+})
+export class CourseFormComponent {
+  course = { title: '', description: '' };
+
+  constructor(private courseService: CourseService, private router: Router) {}
+
+  addCourse() {
+    this.courseService.addCourse(this.course).subscribe(() => this.router.navigate(['/courses']));
+  }
+}
+
+lecture-form.component.ts
+
+import { Component } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { LectureService } from '../../services/lecture.service';
+
+@Component({
+  selector: 'app-lecture-form',
+  templateUrl: './lecture-form.component.html'
+})
+export class LectureFormComponent {
+  lecture = { title: '', description: '', courseId: '' };
+
+  constructor(private lectureService: LectureService, private route: ActivatedRoute, private router: Router) {}
+
+  ngOnInit(): void {
+    this.lecture.courseId = this.route.snapshot.params['id'];
+  }
+
+  addLecture() {
+    this.lectureService.addLecture(this.lecture).subscribe(() =>
+      this.router.navigate([`/courses/${this.lecture.courseId}/lectures`])
+    );
+  }
+}
+
+
+---
+
+course-lectures.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { LectureService } from '../../services/lecture.service';
+
+@Component({
+  selector: 'app-course-lectures',
+  templateUrl: './course-lectures.component.html'
+})
+export class CourseLecturesComponent implements OnInit {
+  lectures: any[] = [];
+
+  constructor(private route: ActivatedRoute, private lectureService: LectureService) {}
+
+  ngOnInit(): void {
+    const courseId = this.route.snapshot.params['id'];
+    this.lectureService.getLecturesByCourse(courseId).subscribe(data => this.lectures = data as any[]);
+  }
+}
+
+
+---
+
+Once this is set up:
+
+Run the backend first (Spring Boot)
+
+Then cd elearning-frontend and run ng serve
+
+Navigate to http://localhost:4200
+
+
+Let me know if you want:
+
+Admin dashboard UI
+
+Styling with Angular Material or Bootstrap
+
+Role-based view hiding (buttons for teacher/admin only)
+
+
+I’ll send that next if needed!
 
