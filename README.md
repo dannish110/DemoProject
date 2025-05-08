@@ -1,164 +1,105 @@
-// ========================= BACKEND (Spring Boot + MongoDB + JWT) =========================
+You're right—currently your `update_task` and `delete_task` methods iterate through both `day_tasks` and `night_tasks` separately, duplicating logic. Also, in your `main.py`, the update prompt asks for new input even if the task ID is invalid.
 
-// 1. pom.xml dependencies <dependencies> <dependency> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-starter-web</artifactId> </dependency> <dependency> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-starter-security</artifactId> </dependency> <dependency> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-starter-data-mongodb</artifactId> </dependency> <dependency> <groupId>io.jsonwebtoken</groupId> <artifactId>jjwt</artifactId> <version>0.9.1</version> </dependency> </dependencies>
+Here's how we’ll improve this:
 
-// 2. User.java @Document("users") public class User { @Id private String id; private String username; private String email; private String password; private String role; // STUDENT, TEACHER, ADMIN }
+---
 
-// 3. Course.java @Document("courses") public class Course { @Id private String id; private String title; private String description; private String teacherId; }
+### **Improvements in `task_manager.py`:**
 
-// 4. Lecture.java @Document("lectures") public class Lecture { @Id private String id; private String title; private String content; private String courseId; }
+1. **Combine the search logic into a helper method `find_task_by_id`** to avoid repeated code.
+2. **Only proceed with update if the task is found.**
+3. **Update the task in-place instead of removing and appending.**
 
-// 5. UserRepository.java public interface UserRepository extends MongoRepository<User, String> { Optional<User> findByUsername(String username); }
+### **Improved `task_manager.py`**
 
-// 6. JWTUtil.java @Component public class JWTUtil { private final String secret = "secretkey";
+```python
+from model.task import Task
+from datetime import time
 
-public String generateToken(User user) {
-    return Jwts.builder()
-        .setSubject(user.getUsername())
-        .claim("role", user.getRole())
-        .signWith(SignatureAlgorithm.HS512, secret)
-        .compact();
-}
+class TaskManager:
+    def __init__(self):
+        self.tasks = {"day_tasks": [], "night_tasks": []}
 
-public String getUsername(String token) {
-    return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody().getSubject();
-}
+    def add_task(self, task: Task):
+        try:
+            if len(self.tasks["day_tasks"]) >= 10 and len(self.tasks["night_tasks"]) >= 10:
+                return "You have added the maximum number of tasks."
 
-public boolean validateToken(String token) {
-    try {
-        Jwts.parser().setSigningKey(secret).parseClaimsJws(token);
-        return true;
-    } catch (Exception e) {
-        return false;
-    }
-}
+            task_time = task.date_time_to_do.time()
 
-}
+            if time(6, 0) <= task_time <= time(21, 0):
+                if len(self.tasks["day_tasks"]) < 10:
+                    self.tasks["day_tasks"].append(task)
+                    return "Task added to day tasks successfully."
+                else:
+                    return "You have added the maximum number of day tasks."
+            else:
+                if len(self.tasks["night_tasks"]) < 10:
+                    self.tasks["night_tasks"].append(task)
+                    return "Task added to night tasks successfully."
+                else:
+                    return "You have added the maximum number of night tasks."
+        except Exception as e:
+            return f"Error Adding Task: {e}"
 
-// 7. UserService.java @Service public class UserService implements UserDetailsService { @Autowired private UserRepository userRepo; @Autowired private PasswordEncoder encoder;
+    def view_tasks(self):
+        return self.tasks
 
-public User register(User user) {
-    user.setPassword(encoder.encode(user.getPassword()));
-    return userRepo.save(user);
-}
+    def find_task_by_id(self, task_id):
+        for key in ["day_tasks", "night_tasks"]:
+            for idx, task in enumerate(self.tasks[key]):
+                if task.id == task_id:
+                    return key, idx
+        return None, None
 
-public User authenticate(String username, String rawPassword) {
-    User user = userRepo.findByUsername(username).orElseThrow();
-    if (encoder.matches(rawPassword, user.getPassword())) return user;
-    else throw new RuntimeException("Invalid credentials");
-}
+    def update_task(self, task_id: int, updated_task: Task):
+        try:
+            key, idx = self.find_task_by_id(task_id)
+            if key is not None:
+                self.tasks[key][idx] = updated_task
+                return f"Task {task_id} updated successfully."
+            return f"Task {task_id} not found."
+        except Exception as e:
+            return f"Error Updating Task: {e}"
 
-@Override
-public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-    User user = userRepo.findByUsername(username).orElseThrow();
-    return new org.springframework.security.core.userdetails.User(
-        user.getUsername(), user.getPassword(), List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
-}
+    def delete_task(self, task_id: int):
+        try:
+            key, idx = self.find_task_by_id(task_id)
+            if key is not None:
+                self.tasks[key].pop(idx)
+                return f"Task {task_id} is deleted."
+            return f"Task {task_id} not found."
+        except Exception as e:
+            return f"Error Deleting Task: {e}"
+```
 
-}
+---
 
-// 8. AuthController.java @RestController @RequestMapping("/api/auth") public class AuthController { @Autowired private UserService userService; @Autowired private JWTUtil jwtUtil;
+### **Improvements in `main.py`:**
 
-@PostMapping("/register")
-public ResponseEntity<User> register(@RequestBody User user) {
-    return ResponseEntity.ok(userService.register(user));
-}
+* **Ask for update details only after confirming the ID exists.**
 
-@PostMapping("/login")
-public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> body) {
-    User user = userService.authenticate(body.get("username"), body.get("password"));
-    String token = jwtUtil.generateToken(user);
-    return ResponseEntity.ok(Map.of("token", token, "role", user.getRole(), "id", user.getId()));
-}
+```python
+elif option == "U":
+    task_id = int(input("Enter Task ID to update: "))
+    found_key, _ = task_manager.find_task_by_id(task_id)
+    if found_key is None:
+        print(f"Task {task_id} not found.")
+    else:
+        title = input("Enter Title of Task: ")
+        description = input("Enter Description of the Task: ")
+        date_time_to_do = input("Enter Task Time (YYYY-MM-DD HH:MM): ")
+        updated_task = Task(id=task_id, title=title, description=description, date_time_to_do=date_time_to_do)
+        result = task_manager.update_task(task_id, updated_task)
+        print(result)
+```
 
-}
+---
 
-// 9. JWTFilter.java @Component public class JWTFilter extends OncePerRequestFilter { @Autowired private JWTUtil jwtUtil; @Autowired private UserService userService;
+This approach:
 
-@Override
-protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader != null && authHeader.startsWith("Bearer ")) {
-        String token = authHeader.substring(7);
-        if (jwtUtil.validateToken(token)) {
-            String username = jwtUtil.getUsername(token);
-            UserDetails userDetails = userService.loadUserByUsername(username);
-            UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(auth);
-        }
-    }
-    chain.doFilter(request, response);
-}
+* Removes duplicate looping logic.
+* Avoids asking for unnecessary input.
+* Improves efficiency and readability.
 
-}
-
-// 10. SecurityConfig.java @Configuration public class SecurityConfig { @Autowired private JWTFilter jwtFilter;
-
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf().disable()
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/auth/**").permitAll()
-            .requestMatchers("/api/courses/**", "/api/lectures/**").hasAnyRole("TEACHER", "ADMIN")
-            .anyRequest().authenticated())
-        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-    return http.build();
-}
-
-@Bean
-public PasswordEncoder encoder() {
-    return new BCryptPasswordEncoder();
-}
-
-}
-
-// ========================= FRONTEND (Angular 15) =========================
-
-// 1. Angular File Structure src/ ├── app/ │   ├── services/ │   │   └── auth.service.ts │   ├── components/ │   │   ├── login/ │   │   │   ├── login.component.ts/html/css │   │   ├── course-list/ │   │   │   ├── course-list.component.ts/html/css │   ├── app-routing.module.ts │   ├── app.module.ts │   └── app.component.ts/html
-
-// 2. auth.service.ts @Injectable({ providedIn: 'root' }) export class AuthService { private baseUrl = 'http://localhost:8080/api/auth';
-
-constructor(private http: HttpClient) {}
-
-login(credentials: any): Observable<any> { return this.http.post(${this.baseUrl}/login, credentials); }
-
-register(user: any): Observable<any> { return this.http.post(${this.baseUrl}/register, user); }
-
-isLoggedIn(): boolean { return !!localStorage.getItem('token'); } }
-
-// 3. login.component.ts @Component({ selector: 'app-login', templateUrl: './login.component.html' }) export class LoginComponent { username = ''; password = '';
-
-constructor(private auth: AuthService, private router: Router) {}
-
-login() { this.auth.login({ username: this.username, password: this.password }).subscribe( res => { localStorage.setItem('token', res.token); localStorage.setItem('role', res.role); this.router.navigate(['/courses']); }, err => alert('Login failed') ); } }
-
-// 4. login.component.html <input [(ngModel)]="username" placeholder="Username"> <input [(ngModel)]="password" type="password" placeholder="Password"> <button (click)="login()">Login</button>
-
-// 5. app-routing.module.ts const routes: Routes = [ { path: 'login', component: LoginComponent }, { path: 'courses', component: CourseListComponent }, { path: '', redirectTo: '/login', pathMatch: 'full' } ];
-
-@NgModule({ imports: [RouterModule.forRoot(routes)], exports: [RouterModule] }) export class AppRoutingModule {}
-
-// 6. app.component.html
-
-<nav>
-  <a routerLink="/login">Login</a>
-  <a routerLink="/courses" *ngIf="isLoggedIn()">Courses</a>
-</nav>
-<router-outlet></router-outlet>// 7. course-list.component.ts @Component({ selector: 'app-course-list', templateUrl: './course-list.component.html' }) export class CourseListComponent implements OnInit { courses: any[] = [];
-
-ngOnInit() { const token = localStorage.getItem('token'); this.http.get('http://localhost:8080/api/courses', { headers: { Authorization: Bearer ${token} } }).subscribe(data => this.courses = data); }
-
-constructor(private http: HttpClient) {} }
-
-// 8. course-list.component.html
-
-<ul>
-  <li *ngFor="let course of courses">
-    {{ course.title }} - {{ course.description }}
-  </li>
-</ul>// ========================= END =========================
-
-Let me know if you want registration, logout, or role-based routing too!
-
+Would you like me to update the entire code structure with this refactoring included?
